@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>juego</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none}
+body{overflow:hidden;background:#1a0b2e}
+#c{position:absolute;bottom:20px;left:20px;width:150px;height:150px;z-index:10}
+.b{position:absolute;width:50px;height:50px;background:#fff;border:none;font-size:24px;display:flex;align-items:center;justify-content:center;padding:0;margin:0;outline:none;touch-action:none}
+#u{top:0;left:50px}
+#l{top:50px;left:0}
+#r{top:50px;left:100px}
+#d{top:100px;left:50px}
+#ab,#noab{position:absolute;bottom:20px;right:20px;padding:10px 15px;background:#fff;border:none;font-size:16px;z-index:10;outline:none;touch-action:none}
+#noab{right:110px;display:none}
+#gun{position:absolute;bottom:-300px;left:50%;transform:translateX(-50%);height:250px;z-index:5;transition:bottom .3s ease-out;pointer-events:none;filter:brightness(.65)}
+#gun.active{bottom:0}
+#gun.reloading{bottom:-100px}
+#ammo,#candy{position:absolute;top:10px;left:10px;font-size:16px;color:#fff;z-index:10}
+#candy{top:32px}
+#crosshair{position:absolute;top:50%;left:50%;width:6px;height:6px;margin-top:-3px;margin-left:-3px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.2);pointer-events:none;z-index:10}
+</style>
+</head>
+<body>
+
+<div id="c">
+<button class="b" id="u" data-k="f">↑</button>
+<button class="b" id="l" data-k="l">←</button>
+<button class="b" id="r" data-k="r">→</button>
+<button class="b" id="d" data-k="b">↓</button>
+</div>
+
+<button id="ab">arma</button>
+<button id="noab">no arma</button>
+
+<div id="ammo">balas: 10/10</div>
+<div id="candy">dulces: 0</div>
+<div id="crosshair"></div>
+
+<img id="gun" src="https://i.postimg.cc/3rdZxFsY/file-00000000f718820e8463ef102133887e.png">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+let scene=new THREE.Scene();
+scene.background=new THREE.Color(0x1a0b2e);
+
+let camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,1000);
+camera.position.set(0,2,0);
+
+let renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+let loader=new THREE.TextureLoader();
+loader.setCrossOrigin("anonymous");
+
+let MAP_SIZE=340;
+let HALF_MAP=MAP_SIZE/2;
+
+let grassTex=loader.load("https://i.postimg.cc/13vmJRbP/images.jpg");
+grassTex.wrapS=THREE.RepeatWrapping;
+grassTex.wrapT=THREE.RepeatWrapping;
+grassTex.repeat.set(32,32);
+
+let plane=new THREE.Mesh(
+new THREE.PlaneGeometry(MAP_SIZE,MAP_SIZE),
+new THREE.MeshBasicMaterial({map:grassTex,color:0x444455})
+);
+plane.rotation.x=-Math.PI/2;
+scene.add(plane);
+
+let monsterTex=loader.load("https://i.postimg.cc/858b3G6N/Zombie-Chicken.webp");
+let monsterMat=new THREE.SpriteMaterial({map:monsterTex,color:0x888899});
+
+let palaTex=loader.load("https://i.postimg.cc/bwLNGv4Z/images.jpg");
+let palaMat=new THREE.SpriteMaterial({map:palaTex,color:0x888899});
+
+let decoTex1=loader.load("https://i.postimg.cc/rsDb3FMK/file-00000000eda0820ea5238825c809ed00.png");
+let decoTex2=loader.load("https://i.postimg.cc/QMjzsqjL/file-00000000f59c820e9588664d173739fc.png");
+
+let decoMat1=new THREE.SpriteMaterial({map:decoTex1,color:0x777788,transparent:true});
+let decoMat2=new THREE.SpriteMaterial({map:decoTex2,color:0x777788,transparent:true});
+
+let cornerTex=loader.load("https://i.postimg.cc/RFCHWfyK/25136df452c049ec8343b90120905980.webp");
+let cornerMat=new THREE.SpriteMaterial({map:cornerTex,color:0x777788,transparent:true});
+let cornerObj=new THREE.Sprite(cornerMat);
+cornerObj.scale.set(3,3,1);
+cornerObj.position.set(HALF_MAP-15,1.5,-(HALF_MAP-15));
+scene.add(cornerObj);
+
+function addDeco(x,z,mat,scale){
+let s=new THREE.Sprite(mat);
+s.scale.set(scale,scale,1);
+s.position.set(x,scale*.5,z);
+scene.add(s);
+return s;
+}
+
+function spawnDecoGroup(cx,cz){
+let count=2+Math.floor(Math.random()*3);
+let useSecond=Math.random()<.5;
+let base=useSecond?decoMat2:decoMat1;
+let scale=useSecond?2:1.5;
+
+for(let i=0;i<count;i++){
+let ox=(Math.random()-.5)*3;
+let oz=(Math.random()-.5)*3;
+addDeco(cx+ox,cz+oz,base,scale);
+}
+}
+
+for(let i=0;i<10;i++){
+let x=(Math.random()-.5)*MAP_SIZE*.75;
+let z=(Math.random()-.5)*MAP_SIZE*.75;
+spawnDecoGroup(x,z);
+}
+
+let houseTex=loader.load("https://i.postimg.cc/6Qhc3FBR/file-0000000011cc820ea4a714ea999ea695.png");
+let candyTex=loader.load("https://i.postimg.cc/8C8ZF1Rk/file-000000002dc8820ea7bb3fc273d1f14a.png");
+let pumpkinTex=loader.load("https://i.postimg.cc/rsDb3FMK/file-00000000eda0820ea5238825c809ed00.png");
+let treeTex=loader.load("https://i.postimg.cc/0NJT6kbF/file-0000000038a0820ea63a9b5d6eb73879.png");
+
+let houseMat=new THREE.SpriteMaterial({map:houseTex,color:0x777788,transparent:true});
+let candyMat=new THREE.SpriteMaterial({map:candyTex,color:0x777788,transparent:true});
+let pumpkinMat=new THREE.SpriteMaterial({map:pumpkinTex,color:0x777788,transparent:true});
+let treeMat=new THREE.SpriteMaterial({map:treeTex,color:0x777788,transparent:true});
+
+let houses=[];
+let candies=[];
+let pumpkins=[];
+
+function addHouse(x,z,size){
+let h=new THREE.Sprite(houseMat);
+h.scale.set(size,size,size);
+h.position.set(x,size*.5,z);
+h.userData.radius=size*.42;
+scene.add(h);
+houses.push(h);
+}
+
+addHouse(-85,-75,22);
+addHouse(72,-88,24);
+addHouse(92,65,23);
+
+function addCandy(x,z){
+let c=new THREE.Sprite(candyMat);
+c.scale.set(3,3,1);
+c.position.set(x,1.5,z);
+scene.add(c);
+candies.push(c);
+}
+
+function addPumpkin(x,z){
+let p=new THREE.Sprite(pumpkinMat);
+p.scale.set(2,2,1);
+p.position.set(x,1,z);
+scene.add(p);
+pumpkins.push(p);
+}
+
+function addTree(x,z){
+let t=new THREE.Sprite(treeMat);
+let s=5+Math.random()*3;
+t.scale.set(s,s,1);
+t.position.set(x,s*.5,z);
+scene.add(t);
+}
+
+let housePositions=[
+[-85,-75],
+[72,-88],
+[92,65]
+];
+
+for(let i=0;i<housePositions.length;i++){
+let hx=housePositions[i][0];
+let hz=housePositions[i][1];
+
+addCandy(
+hx+(Math.random()-.5)*12,
+hz+(Math.random()-.5)*12
+);
+
+if(Math.random()<.7){
+addPumpkin(
+hx+(Math.random()-.5)*16,
+hz+(Math.random()-.5)*16
+);
+}
+
+if(Math.random()<.7){
+addPumpkin(
+hx+(Math.random()-.5)*18,
+hz+(Math.random()-.5)*18
+);
+}
+}
+
+for(let i=0;i<35;i++){
+let cx=(Math.random()-.5)*MAP_SIZE*.8;
+let cz=(Math.random()-.5)*MAP_SIZE*.8;
+let count=2+Math.floor(Math.random()*4);
+
+for(let j=0;j<count;j++){
+addPumpkin(
+cx+(Math.random()-.5)*8,
+cz+(Math.random()-.5)*8
+);
+}
+}
+
+for(let i=0;i<75;i++){
+let x=(Math.random()-.5)*(MAP_SIZE-20);
+let z=(Math.random()-.5)*(MAP_SIZE-20);
+addTree(x,z);
+}
+
+let monsters=[];
+let bullets=[];
+
+let bulletGeo=new THREE.SphereGeometry(.1,6,6);
+let bulletMat=new THREE.MeshBasicMaterial({color:0xffff00});
+
+function spawnMonster(x,z){
+let isPala=Math.random()<.01;
+let mat=(isPala?palaMat:monsterMat).clone();
+let sprite=new THREE.Sprite(mat);
+
+sprite.scale.set(5,5,1);
+sprite.position.set(x,2.5,z);
+sprite.userData={
+hp:isPala?15:3,
+hitTimer:0,
+isPala:isPala
+};
+
+scene.add(sprite);
+monsters.push(sprite);
+}
+
+spawnMonster(0,-40);
+
+let k={f:0,b:0,l:0,r:0};
+let keyMap={w:"f",s:"b",a:"l",d:"r"};
+
+function updateButtons(e){
+let keys={f:0,b:0,l:0,r:0};
+
+for(let i=0;i<e.touches.length;i++){
+let t=e.touches[i];
+let el=document.elementFromPoint(t.clientX,t.clientY);
+
+if(el&&el.classList.contains("b")){
+keys[el.dataset.k]=1;
+}
+}
+
+k=keys;
+}
+
+document.querySelectorAll(".b").forEach(b=>{
+b.addEventListener("touchstart",updateButtons,{passive:false});
+b.addEventListener("touchmove",updateButtons,{passive:false});
+b.addEventListener("touchend",updateButtons,{passive:false});
+b.addEventListener("touchcancel",updateButtons,{passive:false});
+
+b.addEventListener("mousedown",()=>{
+k[b.dataset.k]=1;
+});
+
+b.addEventListener("mouseup",()=>{
+k[b.dataset.k]=0;
+});
+
+b.addEventListener("mouseleave",()=>{
+k[b.dataset.k]=0;
+});
+});
+
+let yaw=0;
+let pitch=0;
+let dragTouchId=null;
+let lastX=0;
+let lastY=0;
+let isMouseDown=false;
+let gameOver=false;
+
+let hasGun=false;
+let canShoot=true;
+let ammo=10;
+let candyCount=0;
+
+let abBtn=document.getElementById("ab");
+let noabBtn=document.getElementById("noab");
+let gunImg=document.getElementById("gun");
+let ammoTxt=document.getElementById("ammo");
+let candyTxt=document.getElementById("candy");
+
+function toggleGun(){
+if(!hasGun){
+hasGun=true;
+gunImg.classList.add("active");
+abBtn.innerText="disparar";
+noabBtn.style.display="block";
+}else{
+shoot();
+}
+}
+
+abBtn.addEventListener("touchstart",e=>{
+e.preventDefault();
+e.stopPropagation();
+toggleGun();
+},{passive:false});
+
+abBtn.addEventListener("click",e=>{
+e.stopPropagation();
+toggleGun();
+});
+
+function removeGun(){
+hasGun=false;
+gunImg.classList.remove("active");
+abBtn.innerText="arma";
+noabBtn.style.display="none";
+}
+
+noabBtn.addEventListener("touchstart",e=>{
+e.preventDefault();
+e.stopPropagation();
+removeGun();
+},{passive:false});
+
+noabBtn.addEventListener("click",e=>{
+e.stopPropagation();
+removeGun();
+});
+
+function shoot(){
+if(!hasGun||!canShoot||gameOver||ammo<=0)return;
+
+canShoot=false;
+ammo--;
+ammoTxt.innerText="balas: "+ammo+"/10";
+
+setTimeout(()=>{
+canShoot=true;
+},300);
+
+let bullet=new THREE.Mesh(bulletGeo,bulletMat);
+bullet.position.copy(camera.position);
+
+let dir=new THREE.Vector3(0,0,-1);
+dir.applyQuaternion(camera.quaternion).normalize();
+
+bullet.userData={dir:dir,life:100};
+scene.add(bullet);
+bullets.push(bullet);
+
+if(ammo===0){
+gunImg.classList.add("reloading");
+
+setTimeout(()=>{
+ammo=10;
+ammoTxt.innerText="balas: 10/10";
+gunImg.classList.remove("reloading");
+},4000);
+}
+}
+
+window.addEventListener("touchstart",e=>{
+if(gameOver)return;
+
+for(let i=0;i<e.changedTouches.length;i++){
+let t=e.changedTouches[i];
+
+if(
+!t.target.classList.contains("b")&&
+t.target.id!=="ab"&&
+t.target.id!=="noab"&&
+dragTouchId===null
+){
+dragTouchId=t.identifier;
+lastX=t.clientX;
+lastY=t.clientY;
+}
+}
+},{passive:false});
+
+window.addEventListener("touchmove",e=>{
+if(gameOver)return;
+
+for(let i=0;i<e.changedTouches.length;i++){
+let t=e.changedTouches[i];
+
+if(t.identifier===dragTouchId){
+let dx=t.clientX-lastX;
+let dy=t.clientY-lastY;
+
+yaw-=dx*.005;
+pitch-=dy*.005;
+
+pitch=Math.max(-Math.PI/2+.01,Math.min(Math.PI/2-.01,pitch));
+
+camera.rotation.order="YXZ";
+camera.rotation.y=yaw;
+camera.rotation.x=pitch;
+
+lastX=t.clientX;
+lastY=t.clientY;
+}
+}
+},{passive:false});
+
+function resetTouch(e){
+for(let i=0;i<e.changedTouches.length;i++){
+if(e.changedTouches[i].identifier===dragTouchId){
+dragTouchId=null;
+}
+}
+}
+
+window.addEventListener("touchend",resetTouch,{passive:false});
+window.addEventListener("touchcancel",resetTouch,{passive:false});
+
+function turnCamera(dx,dy){
+yaw-=dx*.005;
+pitch-=dy*.005;
+pitch=Math.max(-Math.PI/2+.01,Math.min(Math.PI/2-.01,pitch));
+camera.rotation.order="YXZ";
+camera.rotation.y=yaw;
+camera.rotation.x=pitch;
+}
+
+window.addEventListener("mousedown",e=>{
+if(gameOver)return;
+
+if(e.button===2){
+e.preventDefault();
+if(hasGun)shoot();
+return;
+}
+
+if(e.button!==0)return;
+
+if(!e.target.classList.contains("b")&&e.target.id!=="ab"&&e.target.id!=="noab"){
+isMouseDown=true;
+lastX=e.clientX;
+lastY=e.clientY;
+
+if(document.pointerLockElement!==renderer.domElement&&renderer.domElement.requestPointerLock){
+renderer.domElement.requestPointerLock();
+}
+}
+});
+
+window.addEventListener("mousemove",e=>{
+if(gameOver)return;
+
+if(document.pointerLockElement===renderer.domElement){
+turnCamera(e.movementX,e.movementY);
+return;
+}
+
+if(!isMouseDown)return;
+
+turnCamera(e.clientX-lastX,e.clientY-lastY);
+lastX=e.clientX;
+lastY=e.clientY;
+});
+
+window.addEventListener("mouseup",()=>{
+isMouseDown=false;
+});
+
+window.addEventListener("contextmenu",e=>e.preventDefault());
+
+window.addEventListener("keydown",e=>{
+let key=e.key.toLowerCase();
+
+if(keyMap[key]){
+k[keyMap[key]]=1;
+e.preventDefault();
+}
+
+if(key==="h"&&!e.repeat){
+if(hasGun){
+removeGun();
+}else{
+hasGun=true;
+gunImg.classList.add("active");
+abBtn.innerText="disparar";
+noabBtn.style.display="block";
+}
+}
+});
+
+window.addEventListener("keyup",e=>{
+let key=e.key.toLowerCase();
+if(keyMap[key])k[keyMap[key]]=0;
+});
+
+window.addEventListener("blur",()=>{
+k={f:0,b:0,l:0,r:0};
+isMouseDown=false;
+});
+
+setInterval(()=>{
+if(gameOver)return;
+
+if(monsters.length<15&&Math.random()<.4){
+let angle=Math.random()*Math.PI*2;
+let dist=20+Math.random()*20;
+
+spawnMonster(
+camera.position.x+Math.cos(angle)*dist,
+camera.position.z+Math.sin(angle)*dist
+);
+}
+},3000);
+
+let tempDir=new THREE.Vector3();
+let tempSide=new THREE.Vector3();
+let tempMDir=new THREE.Vector3();
+let pushDir=new THREE.Vector3();
+
+function checkHouseCollision(oldX,oldZ){
+for(let i=0;i<houses.length;i++){
+let h=houses[i];
+let dx=camera.position.x-h.position.x;
+let dz=camera.position.z-h.position.z;
+let r=h.userData.radius;
+
+if(dx*dx+dz*dz<r*r){
+camera.position.x=oldX;
+camera.position.z=oldZ;
+return;
+}
+}
+}
+
+function updateCandies(){
+for(let i=candies.length-1;i>=0;i--){
+let c=candies[i];
+let dx=camera.position.x-c.position.x;
+let dz=camera.position.z-c.position.z;
+
+if(dx*dx+dz*dz<9){
+scene.remove(c);
+candies.splice(i,1);
+
+candyCount+=8+Math.floor(Math.random()*20);
+candyTxt.innerText="dulces: "+candyCount;
+}
+}
+}
+
+function loop(){
+if(gameOver)return;
+
+requestAnimationFrame(loop);
+
+tempDir.set(0,0,-1);
+tempDir.applyQuaternion(camera.quaternion);
+tempDir.y=0;
+tempDir.normalize();
+
+tempSide.set(1,0,0);
+tempSide.applyQuaternion(camera.quaternion);
+tempSide.y=0;
+tempSide.normalize();
+
+let oldX=camera.position.x;
+let oldZ=camera.position.z;
+let speed=.15;
+
+if(k.f)camera.position.addScaledVector(tempDir,speed);
+if(k.b)camera.position.addScaledVector(tempDir,-speed);
+if(k.l)camera.position.addScaledVector(tempSide,-speed);
+if(k.r)camera.position.addScaledVector(tempSide,speed);
+
+checkHouseCollision(oldX,oldZ);
+
+camera.position.x=Math.max(-HALF_MAP+2,Math.min(HALF_MAP-2,camera.position.x));
+camera.position.z=Math.max(-HALF_MAP+2,Math.min(HALF_MAP-2,camera.position.z));
+
+updateCandies();
+
+for(let i=bullets.length-1;i>=0;i--){
+let b=bullets[i];
+
+b.position.addScaledVector(b.userData.dir,1.5);
+b.userData.life--;
+
+let hit=false;
+
+for(let j=monsters.length-1;j>=0;j--){
+let m=monsters[j];
+
+if(b.position.distanceTo(m.position)<2.5){
+m.userData.hp--;
+m.userData.hitTimer=.3;
+m.material.color.setHex(0xff0000);
+
+pushDir.copy(b.userData.dir);
+pushDir.y=0;
+pushDir.normalize();
+
+m.position.addScaledVector(pushDir,2);
+
+if(m.userData.hp<=0){
+scene.remove(m);
+monsters.splice(j,1);
+}
+
+hit=true;
+break;
+}
+}
+
+if(hit||b.userData.life<=0){
+scene.remove(b);
+bullets.splice(i,1);
+}
+}
+
+for(let i=monsters.length-1;i>=0;i--){
+let m=monsters[i];
+
+if(m.userData.hitTimer>0){
+m.userData.hitTimer-=.016;
+
+if(m.userData.hitTimer<=0){
+m.material.color.setHex(0x888899);
+}
+}
+
+tempMDir.subVectors(camera.position,m.position);
+tempMDir.y=0;
+
+let dist=tempMDir.length();
+
+if(dist<1.5){
+gameOver=true;
+break;
+}
+
+if(dist>0){
+tempMDir.multiplyScalar(1/dist);
+m.position.addScaledVector(tempMDir,.035);
+}
+}
+
+renderer.render(scene,camera);
+}
+
+loop();
+
+window.addEventListener("resize",()=>{
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
